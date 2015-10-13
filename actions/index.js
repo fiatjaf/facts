@@ -1,4 +1,4 @@
-import pouch from '../pouch'
+import { factsDB, entitiesDB } from '../pouch'
 
 export const ADDED_FACT = 'ADDED_FACT'
 export const ADDED_FACT_ERROR = 'ADDED_FACT_ERROR'
@@ -11,8 +11,6 @@ export const PREDICATES_RECEIVED = 'PREDICATES_RECEIVED'
 export const PREDICATES_ERROR = 'PREDICATES_ERROR'
 export const ENTITY_DETAILS_RECEIVED = 'ENTITY_DETAILS_RECEIVED'
 export const ENTITY_DETAILS_ERROR = 'ENTITY_DETAILS_ERROR'
-export const SUGGESTIONS_RECEIVED = 'SUGGESTIONS_RECEIVED'
-export const SUGGESTIONS_ERROR = 'SUGGESTIONS_ERROR'
 
 export function addFact(triple) {
   return dispatch => {
@@ -20,7 +18,7 @@ export function addFact(triple) {
       _id: Date.now() + '-' + localStorage.getItem('_machine_name') || '_',
       triple: [triple.subject, triple.predicate, triple.object]
     }
-    return pouch.put(fact)
+    return factsDB.put(fact)
     .then(res => {
       fact._rev = res.rev
       dispatch({
@@ -50,7 +48,7 @@ function fetchFacts(from) {
       type: REQUEST_FACTS,
       from
     })
-    return pouch.allDocs({
+    return factsDB.allDocs({
       descending: true,
       include_docs: true,
       startkey: from.toString(),
@@ -73,15 +71,10 @@ function fetchFacts(from) {
 
 export function fetchEntitiesList() {
   return dispatch => {
-    return pouch.query('facts/entities', {
-      reduce: true,
-      group: 1
+    return entitiesDB.allDocs({
+      include_docs: true
     })
-    .then(res => res.rows.map(function (r) {
-      let e = {}
-      e[r.key[0]] = r.value
-      return e
-    }))
+    .then(res => res.rows.map(row => row.doc))
     .then(entities => dispatch({
       type: ENTITIES_RECEIVED,
       entities
@@ -95,15 +88,11 @@ export function fetchEntitiesList() {
 
 export function fetchPredicatesList() {
   return dispatch => {
-    return pouch.query('facts/predicates', {
+    return factsDB.query('facts/predicates', {
       reduce: true,
       group: 1
     })
-    .then(res => res.rows.map(function (r) {
-      let e = {}
-      e[r.key[0]] = r.value
-      return e
-    }))
+    .then(res => res.rows.map(row => row.key[0]))
     .then(predicates => dispatch({
       type: PREDICATES_RECEIVED,
       predicates
@@ -114,85 +103,3 @@ export function fetchPredicatesList() {
     }))
   }
 }
-
-export function fetchEntityDetailsIfNeeded(entityId) {
-  return (dispatch, getState) => {
-    let state = getState()
-    let entity = state.entitiesById[entityId]
-    /* super naïve check: a 10min threshold */
-    if (entity && Date.now() - entity.lastFetch < 60000) {
-      return
-    }
-    return dispatch(fetchEntityDetails(entityId));
-  }
-}
-function fetchEntityDetails(entityId) {
-  return dispatch => {
-    return pouch.query('facts/entities', {
-      reduce: false,
-      startkey: [entityId],
-      endkey: [entityId, {}]
-    })
-    .then((res) => {
-      let facts = {out: {}, in: {}}
-      res.rows.forEach(function (row) {
-        let base = row.key[2] ? entity.in : entity.out
-        base[row.key[1]] = base[row.key[1]] || []
-        base[row.key[1]].push(row.value)
-      })
-      dispatch({
-        type: ENTITY_DETAILS_RECEIVED,
-        entityId,
-        facts
-      })
-    })
-    .catch(err => dispatch({
-      type: ENTITY_DETAILS_ERROR,
-      reason: err,
-      entityId
-    }))
-  }
-}
-
-/* tuple is something like
-  ['someid', 'somepredicate', '_'],
-  ['someid', '_', 'someotherid'] or
-  ['someid', '_', null]
- */
-export function fetchSuggestionsIfNeeded(tuple) {
-  return (dispatch, getState) => {
-    let state = getState()
-    let stringKey = suggestTupleToString(tuple)
-    let current = state.suggestions[stringKey]
-    /* super naïve check: a 10min threshold */
-    if (current && Date.now() - current.lastFetch < 60000) {
-      return
-    }
-    return dispatch(fetchSuggestions(tuple));
-  }
-}
-function fetchSuggestions(tuple) {
-  return dispatch => {
-    return pouch.query('facts/suggest', {
-      reduce: false,
-      startkey: tuple,
-      endkey: [...tuple, {}]
-    })
-    .then((res) => {
-      let suggestedValues = []
-      res.rows.forEach(function (row) {
-        suggestedValues.push(row.value)
-      })
-      dispatch({
-        type: SUGGESTIONS_RECEIVED,
-        stringKey: suggestTupleToString(tuple),
-        suggestedValues
-      })
-    })
-    .catch(err => dispatch({
-      type: SUGGESTIONS_ERROR,
-      reason: err
-    }))
-  }
-}
-const suggestTupleToString = tuple => tuple.join(':::')

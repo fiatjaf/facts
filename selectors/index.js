@@ -13,25 +13,17 @@ export const factsByIdSelector = createSelector(
   }
 )
 
-export const entitiesByIdSelector = state => state.entities.entitiesById
-export const suggestionsSelector = state => state.entities.suggestions
 export const predicatesSelector = state => state.entities.predicates
 export const entitiesSelector = state => state.entities.entities
-export const predicatesListSelector = createSelector(
-  predicatesSelector,
-  (predicates) => Object.keys(predicates.sort(compareByValue))
-)
-export const entitiesListSelector = createSelector(
+export const entitiesByIdSelector = createSelector(
   entitiesSelector,
-  (entities) => Object.keys(entities.sort(compareByValue))
+  (entitiesList) => {
+    let entitiesById = {}
+    entitiesList.forEach(function (e) {
+      entitiesById[e._id] = e
+    })
+    return entitiesById
+  }
 )
-
-const compareByValue = (a, b) => {
-  if (a.last_nom < b.last_nom)
-    return -1
-  if (a.last_nom > b.last_nom)
-    return 1
-  return 0
-}
 
 export const fetchSelector = state => state.fetch

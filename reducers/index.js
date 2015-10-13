@@ -12,8 +12,6 @@ import {
   PREDICATES_ERROR,
   ENTITY_DETAILS_RECEIVED,
   ENTITY_DETAILS_ERROR,
-  SUGGESTIONS_RECEIVED,
-  SUGGESTIONS_ERROR,
 } from '../actions'
 
 function facts(state={
@@ -32,14 +30,12 @@ function facts(state={
 }
 
 function entities(state={
-  entities: [], /* a list of {entityId: count} to help in autocomplete */
-  predicates: [], /* same as entities, but {predicate: count} */
-  entitiesById: {}, /* {entityId: {fetchError, lastFetch, in, out} } */
-  suggestions: {} /* {stringKey: {fetchError, lastFetch, suggestedValues}} */
+  entities: [], /* a list of {_id: ..., in: {}, out: {}, ...} from entitiesDB */
+  predicates: [], /* a list of predicates, i.e., raw strings */
 }, action) {
   switch (action.type) {
     case ENTITIES_RECEIVED:
-      return immupdate(state, 'entitiesIds', action.entities)
+      return immupdate(state, 'entities', action.entities)
     case ENTITIES_ERROR:
       return state
     case PREDICATES_RECEIVED:
@@ -47,22 +43,9 @@ function entities(state={
     case PREDICATES_ERROR:
       return state
     case ENTITY_DETAILS_RECEIVED:
-      return immupdate(state, `entitiesById.${action.entityId}`, {
-        in: action.facts.in,
-        out: action.facts.out,
-        fetchError: null,
-        lastFetch: Date.now()
-      })
+      return state
     case ENTITY_DETAILS_ERROR:
-      return immupdate(state, `entitiesById.${action.entityId}.fetchError`, action.reason)
-    case SUGGESTIONS_RECEIVED:
-      return immupdate(state, `suggestions.${action.stringKey}`, {
-        suggestedValues: action.suggestedValues,
-        fetchError: null,
-        lastFetch: Date.now()
-      })
-    case SUGGESTIONS_ERROR:
-      return immupdate(state, `suggestions.${action.stringKey}.fetchError`, action.reason)
+      return state
     default:
       return state
   }
