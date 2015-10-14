@@ -103,3 +103,14 @@ export function fetchPredicatesList() {
     }))
   }
 }
+
+export function updateAutoCompleteItems () {
+  return dispatch => {
+    return factsDB.query('facts/suggest', {
+      reduce: false,
+      startkey: tuple,
+      endkey: [...tuple, {}]
+    })
+    .then(res => res.rows.map(row => row.value))
+  }
+}

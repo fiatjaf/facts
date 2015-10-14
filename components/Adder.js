@@ -31,18 +31,25 @@ class Adder extends Component {
 
   handleSubmit (e) {
     e.preventDefault()
+    const { subject, predicate, object } = this.state.triple
+
+    if (!subject || !predicate || !object) { return }
+    if (
+      subject[0] == ':' && (!subject.split(':')[1] || !subject.split(':')[2])
+      || object[0] == ':' && (!object.split(':')[1] || !object.split(':')[2])
+    ) { return }
 
     this.add({
-      subject: this.state.triple.subject,
-      predicate: this.state.triple.predicate,
-      object: this.state.triple.object
+      subject: subject,
+      predicate: predicate,
+      object: object
     })
   }
 
-  handleSelect (value, item) {
+  handleSelect (name, value, item) {
     // update value being typed
     let update = {}
-    update[name] = e.target.value
+    update[name] = value
     this.setState(immupdate(this.state, { triple: update }))
   }
 
@@ -123,7 +130,7 @@ class Adder extends Component {
           key={item._id}
           id={item._id}
           className={item._id.split(':')[1]}
-        >{item.name || Object.keys(item.out).map(r => r + ' => ' + item[r]).join('; ')}</div>
+        >{item.name || Object.keys(item.facts.out).map(r => r + ' => ' + item.facts.out[r]).join('; ')}</div>
       )
     } else {
       // string or number
@@ -153,14 +160,16 @@ Adder.propTypes = {
     _rev: PropTypes.string,
     in: PropTypes.object,
     out: PropTypes.object,
-    name: PropTypes.string
+    name: PropTypes.string,
+    kind: PropTypes.string
   })),
   entities: PropTypes.arrayOf(PropTypes.shape({
     _id: PropTypes.string.isRequired,
     _rev: PropTypes.string,
     in: PropTypes.object,
     out: PropTypes.object,
-    name: PropTypes.string
+    name: PropTypes.string,
+    kind: PropTypes.string
   })),
   predicates: PropTypes.arrayOf(PropTypes.string)
 }

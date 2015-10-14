@@ -9,8 +9,8 @@ class Facts extends Component {
       <ul>
         {this.props.facts.map((fact) =>
           <li key={fact._id}>
-            {fact.triple[0]}
-            {fact.triple[1]}
+            {fact.triple[0]} => 
+            {fact.triple[1]} => 
             {fact.triple[2]}
           </li>
         )}
