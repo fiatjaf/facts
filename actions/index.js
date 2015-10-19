@@ -1,16 +1,13 @@
 import { factsDB, entitiesDB } from '../pouch'
 
 export const ADDED_FACT = 'ADDED_FACT'
-export const ADDED_FACT_ERROR = 'ADDED_FACT_ERROR'
+export const DELETED_FACT = 'DELETED_FACT'
 export const REQUEST_FACTS = 'REQUEST_FACTS'
 export const RECEIVE_FACTS = 'RECEIVE_FACTS'
-export const RECEIVE_FACTS_ERROR = 'RECEIVE_FACTS_ERROR'
 export const ENTITIES_RECEIVED = 'ENTITIES_RECEIVED'
-export const ENTITIES_ERROR = 'ENTITIES_ERROR'
+export const SUGGESTIONS_CHANGED = 'SUGGESTIONS_CHANGED'
 export const PREDICATES_RECEIVED = 'PREDICATES_RECEIVED'
-export const PREDICATES_ERROR = 'PREDICATES_ERROR'
 export const ENTITY_DETAILS_RECEIVED = 'ENTITY_DETAILS_RECEIVED'
-export const ENTITY_DETAILS_ERROR = 'ENTITY_DETAILS_ERROR'
 
 export function addFact(triple) {
   return dispatch => {
@@ -26,14 +23,28 @@ export function addFact(triple) {
         fact
       })
     })
-    .catch(err => dispatch({
-      type: ADDED_FACT_ERROR,
-      reason: err
+    .catch(error => dispatch({
+      type: ADDED_FACT,
+      error
     }))
   }
 }
 
-export function fetchFactsIfNeeded(from) {
+export function deleteFact (fact) {
+  return dispatch => {
+    factsDB.remove(fact)
+    .then(res => dispatch({
+      type: DELETED_FACT,
+      id: res.id
+    }))
+    .catch(error => dispatch({
+      type: DELETED_FACT,
+      error
+    }))
+  }
+}
+
+export function fetchFactsIfNeeded (from) {
   return (dispatch, getState) => {
     let state = getState()
     if (state.fetch.isFetching && state.fetch.fetchingFrom == from) {
@@ -57,14 +68,14 @@ function fetchFacts(from) {
     .then(res => res.rows.map(r => r.doc))
     .then(facts => dispatch({
       type: RECEIVE_FACTS,
-      from: from,
-      facts: facts,
-      receivedAt: Date.now()
-    }))
-    .catch(err => dispatch({
-      type: RECEIVE_FACTS_ERROR,
-      reason: err,
+      receivedAt: Date.now(),
       from,
+      facts
+    }))
+    .catch(error => dispatch({
+      type: RECEIVE_FACTS,
+      error,
+      from
     }))
   }
 }
@@ -79,32 +90,42 @@ export function fetchEntitiesList() {
       type: ENTITIES_RECEIVED,
       entities
     }))
-    .catch(err => dispatch({
-      type: ENTITIES_ERROR,
-      reason: err
+    .catch(error => dispatch({
+      type: ENTITIES_RECEIVED,
+      error
     }))
   }
 }
 
-export function fetchPredicatesList() {
+export function fetchPredicatesList () {
   return dispatch => {
     return factsDB.query('facts/predicates', {
       reduce: true,
       group: 1
     })
-    .then(res => res.rows.map(row => row.key[0]))
+    .then(res => res.rows.map(row => row.key))
     .then(predicates => dispatch({
       type: PREDICATES_RECEIVED,
       predicates
     }))
-    .catch(err => dispatch({
-      type: PREDICATES_ERROR,
-      reason: err
+    .catch(error => dispatch({
+      type: PREDICATES_RECEIVED,
+      error
     }))
   }
 }
 
-export function updateAutoCompleteItems () {
+export function updateAutoCompleteItemsIfNeeded (tuple) {
+  return (dispatch, getState) => {
+    let suggestions = getState().entities.suggestions
+    if (suggestions[tupleToString(tuple)]) {
+      return
+    }
+    return dispatch(updateAutocompleteItems(tuple))
+  }
+}
+
+function updateAutocompleteItems (tuple) {
   return dispatch => {
     return factsDB.query('facts/suggest', {
       reduce: false,
@@ -112,5 +133,15 @@ export function updateAutoCompleteItems () {
       endkey: [...tuple, {}]
     })
     .then(res => res.rows.map(row => row.value))
+    .then(suggestions => dispatch({
+      type: SUGGESTIONS_CHANGED,
+      tuple,
+      suggestions
+    }))
+    .catch(error => dispatch({
+      type: SUGGESTIONS_CHANGED,
+      error
+    }))
   }
 }
+export const tupleToString = tuple => tuple.join('||')

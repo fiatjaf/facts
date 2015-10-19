@@ -23,7 +23,7 @@ if (process.env.NODE_ENV == 'production') {
         <App />
       </Provider>
       <DebugPanel top right bottom>
-        <DevTools store={store} monitor={DiffMonitor} />
+        <DevTools store={store} monitor={LogMonitor} />
       </DebugPanel>
     </div>
     , document.getElementById('root')

@@ -1,22 +1,41 @@
 import { createSelector } from 'reselect'
 
-export const factsSelector = state => state.facts.factsList
-export const factsLengthSelector = state => factsSelector(state).length
-export const factsByIdSelector = createSelector(
-  factsSelector,
+export const factsByIdSelector = state => state.facts.factsById
+export const factsListSelector = createSelector(
+  factsByIdSelector,
+  (factsById) => {
+    let factsList = []
+    for (var id in factsById) {
+      if (factsById[id]) {
+        factsList.push(factsById[id])
+      }
+    }
+    return factsList
+  }
+)
+export const factsLengthSelector = createSelector(
+  factsListSelector,
+  (factsList) => factsList.length
+)
+export const factsByDateSelector = createSelector(
+  factsListSelector,
   (factsList) => {
-    let factsById = {}
-    factsList.forEach(function (fact) {
-      factsById[fact._id] = fact
+    return factsList.concat().sort((a, b) => {
+      if (a._id < b._id) {
+        return -1
+      }
+      if (a._id > b._id) {
+        return 1
+      }
+      return 0
     })
-    return factsById
   }
 )
 
 export const predicatesSelector = state => state.entities.predicates
-export const entitiesSelector = state => state.entities.entities
+export const entitiesListSelector = state => state.entities.entities
 export const entitiesByIdSelector = createSelector(
-  entitiesSelector,
+  entitiesListSelector,
   (entitiesList) => {
     let entitiesById = {}
     entitiesList.forEach(function (e) {
@@ -25,5 +44,6 @@ export const entitiesByIdSelector = createSelector(
     return entitiesById
   }
 )
+export const suggestionsSelector = state => state.entities.suggestions
 
 export const fetchSelector = state => state.fetch

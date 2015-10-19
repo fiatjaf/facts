@@ -2,28 +2,44 @@ import immupdate from 'immupdate'
 import { combineReducers } from 'redux'
 import {
   ADDED_FACT,
-  ADDED_FACT_ERROR,
+  DELETED_FACT,
   REQUEST_FACTS,
   RECEIVE_FACTS,
-  RECEIVE_FACTS_ERROR,
   ENTITIES_RECEIVED,
-  ENTITIES_ERROR,
+  SUGGESTIONS_CHANGED,
   PREDICATES_RECEIVED,
-  PREDICATES_ERROR,
-  ENTITY_DETAILS_RECEIVED,
-  ENTITY_DETAILS_ERROR,
+  tupleToString
 } from '../actions'
 
 function facts(state={
-  factsList: []
+  factsById: {}
 }, action) {
   switch (action.type) {
     case RECEIVE_FACTS:
-      return immupdate(state, 'factsList', action.facts)
+      if (action.error) {
+        console.log('error on reducer', action.type, ':', action.error)
+        return state
+      } else {
+        let factsById = {}
+        action.facts.forEach(fact => {
+          factsById[fact._id] = fact
+        })
+        return immupdate(state, 'factsById', factsById)
+      }
     case ADDED_FACT:
-      return immupdate(state, 'factsList', [action.fact].concat(state.factsList))
-    case ADDED_FACT_ERROR:
-      return state
+      if (action.error) {
+        console.log('error on reducer', action.type, ':', action.error)
+        return state
+      } else {
+        return immupdate(state, `factsById.${action.fact._id}`, action.fact)
+      }
+    case DELETED_FACT:
+      if (action.error) {
+        console.log('error on reducer', action.type, ':', action.error)
+        return state
+      } else {
+        return immupdate(state, `factsById.${action.id}`, null)
+      }
     default:
       return state
   }
@@ -32,20 +48,50 @@ function facts(state={
 function entities(state={
   entities: [], /* a list of {_id: ..., in: {}, out: {}, ...} from entitiesDB */
   predicates: [], /* a list of predicates, i.e., raw strings */
+  suggestions: {} /* a dict of tuples (converted to strings)
+                     mapping to the the suggestions we shall show: {
+                       "subjectid||predicate||_": [objectsuggestion...],
+                       "subjectid||_||null": [predicatesuggestion...],
+                       "_||null||null": [subjectsuggestion...],
+                     } */
 }, action) {
   switch (action.type) {
     case ENTITIES_RECEIVED:
-      return immupdate(state, 'entities', action.entities)
-    case ENTITIES_ERROR:
-      return state
+      if (action.error) {
+        console.log('error on reducer', action.type, ':', action.error)
+        return state
+      } else {
+        return immupdate(state, {
+          entities: action.entities,
+          suggestions: {
+            [tupleToString(['_', null, null])]: action.entities,
+            [tupleToString([null, null, '_'])]: action.entities
+          }
+        })
+      }
     case PREDICATES_RECEIVED:
-      return immupdate(state, 'predicates', action.predicates)
-    case PREDICATES_ERROR:
-      return state
-    case ENTITY_DETAILS_RECEIVED:
-      return state
-    case ENTITY_DETAILS_ERROR:
-      return state
+      if (action.error) {
+        console.log('error on reducer', action.type, ':', action.error)
+        return state
+      } else {
+        return immupdate(state, {
+          predicates: action.predicates,
+          suggestions: {
+            [tupleToString([null, '_', null])]: action.predicates
+          }
+        })
+      }
+    case SUGGESTIONS_CHANGED:
+      if (action.error) {
+        console.log('error on reducer', action.type, ':', action.error)
+        return state
+      } else {
+        return immupdate(state, {
+          suggestions: {
+            [tupleToString(action.tuple)]: action.suggestions
+          }
+        })
+      }
     default:
       return state
   }
@@ -64,18 +110,21 @@ function fetch(state={
         fetchError: null
       })
     case RECEIVE_FACTS:
-      return immupdate(state, {
-        isFetching: false,
-        lastFetch: Date.now(),
-        fetchingFrom: null,
-        fetchError: null
-      })
-    case RECEIVE_FACTS_ERROR:
-      return immupdate(state, {
-        isFetching: false,
-        fetchingFrom: null,
-        fetchError: action.reason
-      })
+      if (action.error) {
+        console.log('error on reducer', action.type, ':', action.error)
+        return immupdate(state, {
+          isFetching: false,
+          fetchingFrom: null,
+          fetchError: action.reason
+        })
+      } else {
+        return immupdate(state, {
+          isFetching: false,
+          lastFetch: Date.now(),
+          fetchingFrom: null,
+          fetchError: null
+        })
+      }
     default:
       return state
   }

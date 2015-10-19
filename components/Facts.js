@@ -1,26 +1,42 @@
 import React, { PropTypes, Component } from 'react'
-import { factsSelector } from '../selectors'
 import { createSelector } from 'reselect'
 import { connect } from 'react-redux'
+import { factsByDateSelector } from '../selectors'
+import { deleteFact } from '../actions'
 
 class Facts extends Component {
+  constructor(props) {
+    super(props)
+    this.clickDeleteItem.bind(this)
+  }
+
+  clickDeleteItem (fact, e) {
+    e.preventDefault()
+    const { dispatch } = this.props
+
+    dispatch(deleteFact(fact))
+  }
+
   render() {
     return (
-      <ul>
+      <table>
+        <tbody>
         {this.props.facts.map((fact) =>
-          <li key={fact._id}>
-            {fact.triple[0]} => 
-            {fact.triple[1]} => 
-            {fact.triple[2]}
-          </li>
+          <tr key={fact._id}>
+            <td>{fact.triple[0]}</td>
+            <td>{fact.triple[1]}</td>
+            <td>{fact.triple[2]}</td>
+            <td><a href="#" onClick={this.clickDeleteItem.bind(this, fact)}>delete</a></td>
+          </tr>
         )}
-      </ul>
+        </tbody>
+      </table>
     )
   }
 }
 
 const selector = createSelector(
-  factsSelector,
+  factsByDateSelector,
   (facts) => {
     return {
       facts

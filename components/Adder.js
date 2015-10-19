@@ -1,10 +1,11 @@
 import React, { Component, PropTypes } from 'react'
+import Sifter from 'sifter'
 import Autocomplete from 'react-autocomplete'
 import immupdate from 'immupdate'
 import { factsDB } from '../pouch'
 import { createSelector } from 'reselect'
-import { entitiesByIdSelector, entitiesSelector, predicatesSelector } from '../selectors'
-import { addFact } from '../actions'
+import { entitiesByIdSelector, entitiesListSelector, predicatesSelector, suggestionsSelector } from '../selectors'
+import { addFact, updateAutoCompleteItemsIfNeeded, tupleToString } from '../actions'
 import { connect } from 'react-redux'
 
 class Adder extends Component {
@@ -16,15 +17,10 @@ class Adder extends Component {
 
     const { entities, predicates } = this.props
     this.state = {
-      suggestions: {
-        subject: entities,
-        predicate: predicates,
-        object: entities
-      },
       triple: {
-        subject: '',
-        predicate: '',
-        object: '',
+        subject: null,
+        predicate: null,
+        object: null,
       }
     }
   }
@@ -54,35 +50,23 @@ class Adder extends Component {
   }
 
   handleChange (name, e, value) {
-    const { subject, predicate, object } = this.state.triple
-    const { entities, predicates, entitiesById } = this.props
-
     // update value being typed
     let update = {}
     update[name] = e.target.value
+    this.setState(immupdate(this.state, { triple: update }))
 
     // getting suggestions from factsDB
+    const { subject, predicate, object } = this.state.triple
+    const { entities, predicates,
+            dispatch } = this.props
+
     let tuple = {
       'subject': ['_', predicate || null, object || null],
       'predicate': [subject || null, '_', object || null],
       'object': [subject || null, predicate || null, '_']
     }[name]
 
-    this.getSuggestions(tuple).then(ss=> {
-      let suggestions = name == 'predicate' ?
-                        ss.concat(predicates) :
-                        ss.map(s => entitiesById[s._id] || s).concat(entities)
-      this.setState(immupdate(this.state, {
-        suggestions: {
-          [name]: suggestions
-        },
-        triple: update,
-      }))
-    })
-    .catch(err => {
-      console.log('error on getSuggestions(', tuple ,'):', err)
-      this.setState(immupdate(this.state, { triple: update }))
-    })
+    dispatch(updateAutoCompleteItemsIfNeeded(tuple))
   }
 
   add(triple) {
@@ -92,30 +76,37 @@ class Adder extends Component {
   }
 
   render() {
-    const { subject, predicate, object } = this.state.suggestions
+    const { subject, predicate, object } = this.state.triple
+    const suggestions = {
+      subject: this.props.suggestions[tupleToString(['_', predicate, object])] || [],
+      predicate: this.props.suggestions[tupleToString([subject, '_', object])] || [],
+      object: this.props.suggestions[tupleToString([subject, predicate, '_'])] || []
+    }
 
     return (
       <form onSubmit={this.handleSubmit}>
         <Autocomplete
           onChange={this.handleChange.bind(this, 'subject')}
           onSelect={this.handleSelect.bind(this, 'subject')}
-          items={subject}
+          items={suggestions.subject}
           getItemValue={this.getItemValue}
           renderItem={this.renderEntity}
+          shouldItemRender={this.shouldEntityRender}
         />
         <Autocomplete
           onChange={this.handleChange.bind(this, 'predicate')}
           onSelect={this.handleSelect.bind(this, 'predicate')}
-          items={predicate}
+          items={suggestions.predicate}
           getItemValue={this.getItemValue}
           renderItem={this.renderEntity}
         />
         <Autocomplete
           onChange={this.handleChange.bind(this, 'object')}
           onSelect={this.handleSelect.bind(this, 'object')}
-          items={object}
+          items={suggestions.object}
           getItemValue={this.getItemValue}
           renderItem={this.renderEntity}
+          shouldItemRender={this.shouldEntityRender}
         />
         <button value="Add">Add</button>
       </form>
@@ -144,13 +135,16 @@ class Adder extends Component {
     return typeof item == 'object' ? item._id : item
   }
 
-  getSuggestions (tuple) {
-    return factsDB.query('facts/suggest', {
-      reduce: false,
-      startkey: tuple,
-      endkey: [...tuple, {}]
-    })
-    .then(res => res.rows.map(row => row.value))
+  shouldEntityRender (item, typed) {
+    let tempItem = {_id: item._id}
+    for (var k in item.out) {
+      tempItem[k] = item.out[k]
+    }
+    let s = new Sifter([item.out])
+    let res = s.search(typed, { fields: Object.keys(tempItem) })[0]
+    if (res && res.score > 0.2) {
+      return true
+    }
   }
 }
 
@@ -176,13 +170,15 @@ Adder.propTypes = {
 
 const selector = createSelector(
   entitiesByIdSelector,
-  entitiesSelector,
+  entitiesListSelector,
   predicatesSelector,
-  (entitiesById, entities, predicates) => {
+  suggestionsSelector,
+  (entitiesById, entities, predicates, suggestions) => {
     return {
       entitiesById,
       entities,
       predicates,
+      suggestions
     }
   }
 )
